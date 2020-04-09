@@ -1,0 +1,11 @@
+
+    - name: iptables backup rules
+      shell: iptables-save > /etc/sysconfig/iptables.`date +'%Y%H%M%S%m%d'`
+    - name: iptables accept rules
+      command: iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT
+    - name: iptables save rules 
+      shell: iptables-save > /etc/sysconfig/iptables
+    - name: Restart service iptables, all rules
+      service:
+        name: iptables
+        state: restarted

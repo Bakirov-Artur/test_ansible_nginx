@@ -1,0 +1,117 @@
+- hosts: all
+  gather_facts: False
+  become: yes
+  tasks:
+    - name: Ping Server
+      ping:
+      #Pepare install
+    - name: Create mount point for dvd-devices
+      file:
+        path: "/media/CentOS"
+        state: directory
+    - name: Mount DVD Repository
+      mount:
+        path: /media/CentOS
+        src: /dev/sr0
+        fstype: iso9660
+        boot: no
+        opts: ro
+        state: mounted
+    - name: List files DVD Repository
+      find:
+        paths: /media/CentOS
+        patterns: '*.*'
+    - name: Desable all repository
+      command: find /etc/yum.repos.d/ -name "*.repo" -exec sed -i 's|enabled=1|enabled=0|g' {} \;
+    - name: Enable Media repository
+      command: find /etc/yum.repos.d/ -name "CentOS-Media.repo" -exec sed -i 's|enabled=0|enabled=1|g' {} \;
+    - name: Yum Clean all cache
+      command: yum clean all
+      args:
+        warn: no
+    - name: Install libselinux-python
+      yum:
+        name: libselinux-python
+        disablerepo: "extras,updates,base"
+        state: present
+    - name: Initialization repository Nginx
+      template:
+        src: "templates/nginx.repo.j2"
+        dest: "/etc/yum.repos.d/nginx.repo"
+        owner: root
+        group: root
+        mode: 0644      
+    - name: Install yum-utils
+      yum:
+        name: 
+        - yum-utils
+        disablerepo: "extras,updates,base"
+        state: present
+    - name: Install nginx
+      yum:
+        name: nginx
+        enablerepo: "nginx-mainline"
+        disablerepo: "extras,updates,base"
+        state: present
+    - name: Restart service nginx, in all cases
+      service:
+        name: nginx
+        state: restarted
+    - name: Check open http port
+      wait_for:
+        port: "{{ item }}"
+        state: started         # Port should be open
+        delay: 0               # No wait before first check (sec)
+        timeout: 3             # Stop checking after timeout (sec)
+      ignore_errors: no
+      with_items:
+        - 80
+    - name: iptables backup rules
+      shell: iptables-save > /etc/sysconfig/iptables.`date +'%Y%H%M%S%m%d'`
+    - name: iptables rules apply
+      template:
+        src: "templates/iptables.rules.j2"
+        dest: "/etc/sysconfig/iptables"
+        owner: root
+        group: root
+        mode: 0644      
+    - name: Restart service iptables, all rules
+      service:
+        name: iptables
+        state: restarted
+    - name: Config service nginx
+      template:
+        src: "templates/nginx.conf.j2"
+        dest: "/etc/nginx/nginx.conf"
+        owner: root
+        group: root
+        mode: 0644      
+#    - name: Uploads configs for Nginx
+#      copy:
+#        src: "templates/ext_nginx_conf/nginx_{{location}}_{{upstream}}.tar"
+#        dest: "/tmp/"
+#        owner: root
+#        group: root
+#        mode: 0644
+     # archive:
+     #   path: 
+     #   - "templates/ext_nginx_conf/{{location}}.conf"
+     #   - "templates/ext_nginx_conf/{{upstream}}.conf"
+     #   dest: "/tmp/nginx_{{location}}_{{upstream}}.tar"
+     #   format: tar
+    - name: backup Nginx configs
+      shell: tar cf /opt/backup.`date +'%Y%H%M%S%m%d'`.nginx.tar.gz /etc/nginx/
+      warn: no
+    - name: Unzipped Nginx configs
+     # shell: tar xf /tmp/nginx_{{location}}_{{upstream}}.tar -C /etc/nginx/conf.d 
+     # warn: no
+      unarchive:
+        src: "templates/ext_nginx_conf/nginx_{{location}}_{{upstream}}.tar"
+        dest: "/etc/nginx/conf.d"
+       # remote_src: yes
+    - name: Nginx config test
+      command: nginx -t
+    - name: Restart service nginx, in all cases
+      service:
+        name: nginx
+        state: restarted
