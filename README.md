@@ -1,5 +1,5 @@
 # test_ansible_nginx
-СберБанк ТЗ по ansible
+ТЗ СберБанка по ansible
 ### Развернуть и настроить Nginx
 *   Развернуть с помощью Ansible сервер Nginx (OC RHEL 6.7, версия Nginx любая) – написать задачу в playbook
 *   В файле nginx.conf прописать настройки по выносу конструкций location и upstream  в отдельные файлы – привести пример файла nginx.conf с указанными настройками
